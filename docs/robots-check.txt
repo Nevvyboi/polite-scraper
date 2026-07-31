@@ -1,0 +1,17 @@
+robots: policy read, crawl-delay unset (using the 1.0s floor)
+allowed   https://en.wikipedia.org/wiki/Web_scraping
+          no rule in https://en.wikipedia.org/robots.txt matches /wiki/Web_scraping
+
+REFUSED   https://en.wikipedia.org/w/index.php?title=Web_scraping&action=edit
+          https://en.wikipedia.org/robots.txt line 153: Disallow: /w/
+
+REFUSED   https://en.wikipedia.org/wiki/Special:Random
+          https://en.wikipedia.org/robots.txt line 156: Disallow: /wiki/Special:
+
+robots: policy read, crawl-delay unset (using the 1.0s floor)
+allowed   https://github.com/Nevvyboi/polite-scraper
+          no rule in https://github.com/robots.txt matches /Nevvyboi/polite-scraper
+
+REFUSED   https://github.com/Nevvyboi/polite-scraper/search?q=robots
+          https://github.com/robots.txt line 71: Disallow: /*q=
+
