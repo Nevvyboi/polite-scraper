@@ -75,6 +75,28 @@ def test_a_description_that_genuinely_repeats_is_left_alone():
     assert clean_description(text) == text.strip()
 
 
+# Observed on /catalogue/john-adams_472/: the same truncation, but this one
+# landed on a space, so there is no word fragment to match on.
+def test_a_preview_cut_on_a_word_boundary_is_still_removed():
+    opening = (
+        "In this powerful, epic biography, David McCullough unfolds the "
+        "adventurous life journey of John Adams, the brilliant, fiercely "
+        "independent, often irascible, always honest Yankee patriot who "
+        "spared nothing in his zeal for the American Revolution and was "
+        "the second president of the United States"
+    )
+    text = f"{opening} {opening}, a role he filled for one term. ...more"
+    cleaned = clean_description(text)
+    assert cleaned.count("In this powerful, epic biography") == 1
+    assert cleaned.endswith("a role he filled for one term.")
+
+
+def test_a_short_exact_repeat_is_not_treated_as_a_truncation():
+    opening = "Signed first edition, near fine in a near fine jacket."
+    text = f"{opening} {opening} Shipped from Norwich."
+    assert clean_description(text) == text
+
+
 def test_short_descriptions_are_untouched_apart_from_whitespace():
     assert clean_description("  A   short  note. ") == "A short note."
 

@@ -20,8 +20,18 @@ python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt
 ./.venv/bin/python scrape.py --pages 50
 ```
 
-The second command walks all 50 listing pages and all 1000 books. It takes
-about 20 minutes, almost all of it spent waiting on purpose.
+The second command walks all 50 listing pages and all 1000 books. Measured:
+**27 minutes, 1051 requests, 21.3 MB, 1000 records, no failures**, and 1043 of
+those 1623 seconds spent waiting on purpose.
+
+Once the pages are cached, changing a cleaning rule costs the site nothing:
+
+```bash
+./.venv/bin/python scrape.py --pages 50 --offline
+```
+
+That rebuilds the same 1000 record corpus from disk in **2.9 seconds with zero
+requests**. It is the flag I reached for most while building.
 
 Tests need no network:
 
@@ -76,6 +86,11 @@ and `Retry-After` wins over the backoff when the server sends one.
 cap on every run, and the crawl stops at the first listing page that fails
 rather than guessing at the next URL.
 
+**It can be rebuilt without asking again.** `--offline` reparses and recleans
+everything from the disk cache and sends nothing at all. Cleaning rules change
+far more often than pages do, and there is no reason for the site to pay for
+that.
+
 ## What the cleaning stage is for
 
 Extraction and cleaning are separate modules on purpose. Parsing returns the
@@ -89,14 +104,20 @@ error if you skip the cleaning:
 |---|---|---|
 | `Â£51.77` | The server sends `text/html` with no charset, so `requests` falls back to ISO-8859-1 and every pound sign becomes two characters | decoded from the document's own `<meta charset>`, `price: 51.77`, `currency: "GBP"` |
 | `In stock (22 available)` | A truthiness check on this string is also true for `Out of stock` | `in_stock: true`, `stock_count: 22` |
-| description | The template concatenates a truncated preview with the full text, so the opening appears twice and would be embedded twice | the duplicate opening is removed, 1017 characters down to 633 on the sample book |
+| description | The template concatenates a truncated preview with the full text, so the opening appears twice and would be embedded twice | the duplicate opening is removed, on 895 of the 998 books that have one |
 
-The description case is the one worth explaining. The preview is cut mid-word,
-so the two copies are not identical and a plain "does this substring repeat"
-check does not find it. The detector requires the first copy to end in a
-fragment that the second copy continues, which is what a truncation looks
-like. Writing the test for it caught the first version stripping the opening
-off descriptions that genuinely repeat themselves.
+The description case is the one worth explaining. The preview is usually cut
+mid-word, so the two copies are not identical and a plain "does this substring
+repeat" check does not find it. The detector's main rule is that the first
+copy must end in a fragment the second copy continues: `and love th` followed
+by `and love that` is a truncation, `Buy now.` followed by `Buy now.` is a
+description that repeats itself.
+
+Roughly a third of the previews land exactly on a space, which leaves no
+fragment to match on. Those are only removed when the repeated opening is over
+100 characters, because an exact repeat on its own is far too weak a signal to
+act on. Measured across the corpus, every duplicate found was between 368 and
+376 characters long.
 
 ## Output
 
@@ -121,17 +142,25 @@ own title is close to useless once it is embedded.
 interrupted crawl resumes and a repeated crawl updates in place. Running twice
 leaves 1000 rows, not 2000.
 
-`out/run-report.json` is written after every run:
+`out/run-report.json` is written after every run. The full crawl:
 
 ```json
 {
-  "records": {"new": 5, "updated": 0, "skipped": 0, "refused": 0, "unparsable": 0, "failed": 0},
-  "http": {"network_requests": 7, "not_modified_304": 0, "refused_by_robots": 0,
-           "retries": 0, "kb_downloaded": 112.4, "smallest_gap_between_requests": 1.27},
-  "corpus": {"file": "out/corpus.jsonl", "lines": 5},
-  "database": {"books": 5, "categories": 5, "mean_price": 51.53, "missing_description": 0}
+  "records": {"new": 1000, "updated": 0, "skipped": 0, "refused": 0, "unparsable": 0, "failed": 0},
+  "http": {"network_requests": 1051, "served_from_cache": 0, "not_modified_304": 6,
+           "refused_by_robots": 0, "retries": 0, "failed": 0, "kb_downloaded": 21294.3,
+           "seconds_spent_waiting": 1043.3, "smallest_gap_between_requests": 1.235},
+  "corpus": {"file": "out/corpus.jsonl", "lines": 1000},
+  "database": {"books": 1000, "categories": 50, "mean_price": 35.07,
+               "missing_description": 2, "in_stock": 1000},
+  "wall_clock_seconds": 1623.4
 }
 ```
+
+1000 books across 50 categories, nothing refused, nothing retried, nothing
+unparsable. The two missing descriptions are missing from the pages
+themselves, not lost in parsing. The full log is in
+[out/full-run.log](out/full-run.log).
 
 A run that fetched nothing because robots refused it looks different from a
 run that fetched everything and parsed nothing. Both are visible without
@@ -168,9 +197,10 @@ docs/NOTES.md        decisions, and what the build got wrong first
 
 Named rather than discovered later.
 
-- The description de-duplicator needs the preview to be cut mid-word. A
-  preview cut exactly on a word boundary goes through untouched. The target
-  site does not produce those, so this is untested against real data.
+- The 100 character floor on exact repeats is tuned to one site. A description
+  that legitimately opens with the same long paragraph twice would lose one
+  copy. I have not found one, and 103 descriptions in the corpus were left
+  alone, so the rule is not simply firing on everything.
 - A cached page whose server sent no `ETag` and no `Last-Modified` is served
   from cache indefinitely, because there is no cheap way to revalidate it. Use
   `--refresh` to force those.

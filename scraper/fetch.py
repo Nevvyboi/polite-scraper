@@ -84,6 +84,7 @@ class Fetcher:
         delay_floor: float = 1.0,
         timeout: float = 20.0,
         max_attempts: int = 4,
+        offline: bool = False,
         log=print,
     ):
         from .robots import Robots  # local import keeps the module graph flat
@@ -94,6 +95,7 @@ class Fetcher:
         self.delay_floor = delay_floor
         self.timeout = timeout
         self.max_attempts = max_attempts
+        self.offline = offline
         self.log = log
         self.stats = Stats()
 
@@ -121,6 +123,13 @@ class Fetcher:
             return self._robots[host]
 
         policy_url = host + "/robots.txt"
+        if self.offline:
+            # Offline runs re-read pages already on disk. They send nothing, so
+            # there is nothing for a policy to permit or refuse.
+            policy = self._Robots.allow_all(AGENT_TOKEN, "offline, no request made")
+            self._robots[host] = policy
+            return policy
+
         self._wait_turn(0.0)
         try:
             resp = self.session.get(policy_url, timeout=self.timeout)
@@ -164,6 +173,14 @@ class Fetcher:
             raise RobotsRefusal(url, decision.reason)
 
         cached = self._read_cache(url)
+
+        if self.offline:
+            if cached is None:
+                self.stats.failed += 1
+                return Response(url, 0, "")
+            self.stats.served_from_cache += 1
+            return Response(url, cached["status"], cached["text"], from_cache=True)
+
         if cached and not cached.get("validators"):
             self.stats.served_from_cache += 1
             return Response(url, cached["status"], cached["text"], from_cache=True)

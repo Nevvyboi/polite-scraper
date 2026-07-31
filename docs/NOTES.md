@@ -88,9 +88,45 @@ is a description that repeats itself. The detector now requires the first copy
 to end in a fragment that the second copy continues, and that distinguishes the
 two cases exactly.
 
-It also means a preview cut on a word boundary goes through untouched. I know
-that and left it, because a looser rule is the one that damages real text, and
-this site does not produce that case.
+I then wrote in the README that a preview cut on a word boundary goes through
+untouched, and that the site does not produce that case. Both halves of that
+sentence were guesses, so before shipping it I counted.
+
+The site produces that case 295 times out of 998. Nearly a third of the
+previews land on a space, leaving no fragment to match on, and every one of
+those descriptions was going into the corpus with its opening 375 characters
+duplicated. The detector was catching 601 and missing 295, and I had written
+the miss up as a theoretical edge case.
+
+For those the duplicate is an exact prefix of what follows, which on its own
+is far too weak to act on: two sentences of boilerplate would match it. What
+makes it safe here is length. The truncation is fixed, and measuring the
+duplicates the fragment rule had already caught gave the range: every one was
+between 368 and 376 characters. So exact repeats are removed above 100
+characters and left alone below it.
+
+That took the coverage from 601 to 895, with 103 descriptions left untouched,
+and those 103 are short enough that the site never truncated them.
+
+The lesson is not about scraping. I had written a limitation into the README
+in the confident voice, based on the one page I happened to look at. Counting
+took four minutes and the claim was wrong by 295 records.
+
+## Why there is an --offline flag
+
+Fixing the de-duplicator meant recleaning all 1000 books. The crawl takes 27
+minutes and the cleaning change did not alter a single page on the server, so
+re-fetching would have been 1051 requests to arrive at bytes already sitting on
+my disk.
+
+`--offline` reads the cache and sends nothing. The same rebuild takes 2.9
+seconds and shows `"network_requests": 0` in the report.
+
+It is the flag I used most, and it belongs in an assignment about politeness
+rather than in a footnote about developer convenience. Cleaning rules change
+far more often than pages do. A crawler that cannot separate the two teaches
+its author to re-crawl for every bug fix, and the site pays for the author's
+iteration speed.
 
 ## Why parse and clean are separate modules
 

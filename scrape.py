@@ -68,6 +68,7 @@ def scrape(args) -> int:
     fetcher = Fetcher(
         cache_dir=ROOT / args.cache,
         delay_floor=args.delay,
+        offline=args.offline,
         log=log,
     )
     store = Store(ROOT / args.db)
@@ -76,7 +77,10 @@ def scrape(args) -> int:
     counts = {"new": 0, "updated": 0, "skipped": 0, "refused": 0, "unparsable": 0, "failed": 0}
 
     try:
-        log(f"identifying as: {fetcher.session.headers['User-Agent']}")
+        if args.offline:
+            log("offline: reading the cache only, no requests will be made")
+        else:
+            log(f"identifying as: {fetcher.session.headers['User-Agent']}")
         urls = discover(fetcher, args.start, args.pages, args.limit)
         log(f"discovered {len(urls)} product pages")
 
@@ -148,6 +152,9 @@ def main(argv=None):
     parser.add_argument("--out", default="out/corpus.jsonl")
     parser.add_argument("--report", default="out/run-report.json")
     parser.add_argument("--refresh", action="store_true", help="re-fetch pages already stored")
+    parser.add_argument("--offline", action="store_true",
+                        help="rebuild from the cache without sending a single request, "
+                             "for when the cleaning rules changed but the pages did not")
     return scrape(parser.parse_args(argv))
 
 

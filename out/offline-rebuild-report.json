@@ -1,0 +1,33 @@
+{
+  "records": {
+    "new": 1000,
+    "updated": 0,
+    "skipped": 0,
+    "refused": 0,
+    "unparsable": 0,
+    "failed": 0
+  },
+  "http": {
+    "network_requests": 0,
+    "served_from_cache": 1050,
+    "not_modified_304": 0,
+    "refused_by_robots": 0,
+    "retries": 0,
+    "failed": 0,
+    "kb_downloaded": 0.0,
+    "seconds_spent_waiting": 0.0,
+    "smallest_gap_between_requests": null
+  },
+  "corpus": {
+    "file": "out/corpus.jsonl",
+    "lines": 1000
+  },
+  "database": {
+    "books": 1000,
+    "categories": 50,
+    "mean_price": 35.07,
+    "missing_description": 2,
+    "in_stock": 1000
+  },
+  "wall_clock_seconds": 3.1
+}

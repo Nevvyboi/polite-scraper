@@ -24,6 +24,11 @@ WHITESPACE = re.compile(r"\s+")
 
 CURRENCIES = {"£": "GBP", "$": "USD", "€": "EUR"}
 
+# Shortest repeated opening we will remove when there is no truncated word to
+# confirm it. Anything shorter is more likely to be a description that repeats
+# itself on purpose than a template artefact.
+MIN_DUPLICATE = 100
+
 
 def clean_record(raw: dict) -> dict:
     amount, currency = parse_price(raw.get("price"))
@@ -105,23 +110,41 @@ def clean_description(text: str | None) -> str | None:
 def _strip_repeated_opening(text: str) -> str:
     """Drop a leading copy of the opening if the full text follows it.
 
-    The preview is cut mid-word, so the copy is not exact. The last partial
-    word is dropped before comparing, and the match must cover the whole of
-    the suspected duplicate rather than just its first few characters.
+    The tell is that the preview is cut mid-word. So it is not enough for the
+    opening to appear twice: the first copy has to end in a fragment that the
+    second copy continues. "and love th" followed by "and love that" is a
+    truncation. "Buy now." followed by "Buy now." is a description that simply
+    repeats itself, and gets left alone.
+
+    Roughly a third of the previews on this site happen to land exactly on a
+    word boundary, and those leave no fragment to match on. For those the
+    duplicate is an exact prefix of what follows, which on its own is far too
+    weak a signal, so it is only accepted above MIN_DUPLICATE characters. The
+    truncation is fixed length: measured across 1000 books, every duplicate
+    found was between 368 and 376 characters.
     """
     head = text[:40]
     if len(head) < 40:
         return text
 
     start = text.find(head, 1)
-    if start == -1:
+    if start == -1 or start > len(text) // 2 + 1:
         return text
 
     duplicate = text[:start].rstrip()
     remainder = text[start:]
-    without_partial_word = duplicate.rsplit(" ", 1)[0]
+    if len(remainder) <= len(duplicate):
+        return text
 
-    if without_partial_word and remainder.startswith(without_partial_word):
+    body, _, fragment = duplicate.rpartition(" ")
+    if not body or not fragment or not remainder.startswith(body):
+        return text
+
+    continues = remainder[len(body):].lstrip().split(" ", 1)[0]
+    if continues.startswith(fragment) and len(continues) > len(fragment):
+        return remainder
+
+    if len(duplicate) >= MIN_DUPLICATE and remainder.startswith(duplicate):
         return remainder
     return text
 
