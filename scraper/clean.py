@@ -22,6 +22,16 @@ PRICE = re.compile(r"([£$€])?\s*([0-9][0-9,]*\.?[0-9]*)")
 STOCK_COUNT = re.compile(r"\(\s*(\d+)\s+available\s*\)", re.IGNORECASE)
 WHITESPACE = re.compile(r"\s+")
 
+# Byte order marks and zero width characters that turn up mid paragraph, left
+# behind by whatever produced the page. Python's \s does not match U+FEFF and
+# JavaScript's does, which is how these were found: a port of this function
+# disagreed with it on 2 descriptions out of 998, and the port was right.
+#
+# They are not decoration. A BOM sitting exactly where a duplicated opening
+# ends stops the de-duplicator matching, so a stray invisible character was
+# costing real detections.
+ZERO_WIDTH = re.compile(r"[​‌‍⁠﻿]")
+
 CURRENCIES = {"£": "GBP", "$": "USD", "€": "EUR"}
 
 # Shortest repeated opening we will remove when there is no truncated word to
@@ -60,7 +70,7 @@ def clean_record(raw: dict) -> dict:
 def collapse(text: str | None) -> str | None:
     if text is None:
         return None
-    return WHITESPACE.sub(" ", html.unescape(text)).strip() or None
+    return WHITESPACE.sub(" ", ZERO_WIDTH.sub("", html.unescape(text))).strip() or None
 
 
 def parse_price(text: str | None) -> tuple[float | None, str | None]:

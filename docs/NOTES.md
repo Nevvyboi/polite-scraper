@@ -170,3 +170,28 @@ than it needs to be.
 Content hashing on the stored body, so `updated_at` only moves when something
 actually changed. Right now every `--refresh` run touches all 1000 rows even
 though the 304s prove nothing was modified.
+
+## The invisible character, found by porting the function
+
+Later I ported this de-duplicator to JavaScript to run as a live demo on my
+site, and rather than trust the port I ran both over the same 998 descriptions
+and compared the output. They disagreed on two.
+
+The port was right. Python's `\s` does not match U+FEFF and JavaScript's does,
+and two descriptions carry a byte order mark mid paragraph. On one of them the
+mark sits exactly where the duplicated opening ends, so the prefix comparison
+failed and a real duplicate went through untouched.
+
+Fixing it took coverage from 895 to 897. Two records out of 998 is not much;
+being unable to find them without a second implementation is the part worth
+recording. The regex was written to strip whitespace, an invisible character is
+not whitespace by Python's definition, and no test I would have thought to
+write covers "what if there is a character here you cannot see".
+
+The order matters too. The mark has to be deleted, not collapsed to a space,
+or `within.<BOM>A` becomes `within. A` and gains a word break that was never
+in the text. That was the second disagreement, and it appeared only after I
+fixed the first.
+
+Both implementations now produce identical output on all 998, and there are
+tests for the seam case and for the delete-rather-than-collapse rule.

@@ -104,7 +104,7 @@ error if you skip the cleaning:
 |---|---|---|
 | `Â£51.77` | The server sends `text/html` with no charset, so `requests` falls back to ISO-8859-1 and every pound sign becomes two characters | decoded from the document's own `<meta charset>`, `price: 51.77`, `currency: "GBP"` |
 | `In stock (22 available)` | A truthiness check on this string is also true for `Out of stock` | `in_stock: true`, `stock_count: 22` |
-| description | The template concatenates a truncated preview with the full text, so the opening appears twice and would be embedded twice | the duplicate opening is removed, on 895 of the 998 books that have one |
+| description | The template concatenates a truncated preview with the full text, so the opening appears twice and would be embedded twice | the duplicate opening is removed, on 897 of the 998 books that have one |
 
 The description case is the one worth explaining. The preview is usually cut
 mid-word, so the two copies are not identical and a plain "does this substring
@@ -199,8 +199,14 @@ Named rather than discovered later.
 
 - The 100 character floor on exact repeats is tuned to one site. A description
   that legitimately opens with the same long paragraph twice would lose one
-  copy. I have not found one, and 103 descriptions in the corpus were left
+  copy. I have not found one, and 101 descriptions in the corpus were left
   alone, so the rule is not simply firing on everything.
+- Zero width characters are deleted rather than collapsed to a space, because a
+  byte order mark landing where a duplicated opening ends was defeating the
+  match. Found by porting this function to JavaScript and running both over the
+  same 998 descriptions: they disagreed on two, and the port was right. The
+  JavaScript now agrees on all 998 and is live at
+  [nevvyboi.github.io](https://nevvyboi.github.io/).
 - A cached page whose server sent no `ETag` and no `Last-Modified` is served
   from cache indefinitely, because there is no cheap way to revalidate it. Use
   `--refresh` to force those.

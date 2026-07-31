@@ -91,6 +91,30 @@ def test_a_preview_cut_on_a_word_boundary_is_still_removed():
     assert cleaned.endswith("a role he filled for one term.")
 
 
+# Found by porting this function to JavaScript for a browser demo and running
+# both over the same 998 descriptions. They disagreed on two, and the port was
+# right: a byte order mark sitting exactly where the duplicated opening ends
+# was stopping the match, so an invisible character was costing detections.
+def test_a_zero_width_character_at_the_seam_does_not_defeat_the_detector():
+    opening = (
+        "Follow Suzie on a magical journey of discovering her true self worth within, "
+        "a beautifully illustrated story about believing in yourself when nobody else "
+        "seems to, written for the child who has been told to be smaller than they are"
+    )
+    text = f"{opening}﻿{opening} and for the adult who remembers being that child."
+    cleaned = clean_description(text)
+
+    assert cleaned.count("Follow Suzie on a magical journey") == 1
+    assert "﻿" not in cleaned
+
+
+def test_zero_width_characters_are_deleted_rather_than_turned_into_spaces():
+    # Collapsing them to a space would join two words with a gap that was never
+    # in the text, which is what a naive port did.
+    assert clean_description("within.﻿A beautifully") == "within.A beautifully"
+    assert clean_description("one​two‍three") == "onetwothree"
+
+
 def test_a_short_exact_repeat_is_not_treated_as_a_truncation():
     opening = "Signed first edition, near fine in a near fine jacket."
     text = f"{opening} {opening} Shipped from Norwich."
