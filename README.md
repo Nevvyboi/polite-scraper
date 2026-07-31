@@ -189,7 +189,7 @@ scraper/fetch.py     identification, pacing, caching, conditional GET, backoff
 scraper/parse.py     HTML to raw strings
 scraper/clean.py     raw strings to typed records
 scraper/store.py     SQLite upsert and JSONL export
-tests/               24 tests, no network
+tests/               26 tests, no network
 docs/NOTES.md        decisions, and what the build got wrong first
 ```
 
